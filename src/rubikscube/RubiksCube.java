@@ -176,7 +176,7 @@ public class RubiksCube {
      * @return A Cubie representing the same cube state
      */
     public Cubie toCubie() {
-        Cubie pc = new Cubie();
+        Cubie cubie = new Cubie();
 
         // Process each of the 8 corner positions
         for (int pos = 0; pos < 8; pos++) {
@@ -200,8 +200,8 @@ public class RubiksCube {
             // Match these colors to identify which corner piece this is
             for (int piece = 0; piece < 8; piece++) {
                 if (color1 == CORNER_COLORS[piece][1] && color2 == CORNER_COLORS[piece][2]) {
-                    pc.cornerPerm[pos] = piece;
-                    pc.cornerOrient[pos] = (byte) orientation;
+                    cubie.cornerPerm[pos] = piece;
+                    cubie.cornerOrient[pos] = (byte) orientation;
                     break;
                 }
             }
@@ -216,19 +216,19 @@ public class RubiksCube {
             for (int piece = 0; piece < 12; piece++) {
                 if (color0 == EDGE_COLORS[piece][0] && color1 == EDGE_COLORS[piece][1]) {
                     // Colors match in order - not flipped
-                    pc.edgePerm[pos] = piece;
-                    pc.edgeOrient[pos] = 0;
+                    cubie.edgePerm[pos] = piece;
+                    cubie.edgeOrient[pos] = 0;
                     break;
                 }
                 if (color0 == EDGE_COLORS[piece][1] && color1 == EDGE_COLORS[piece][0]) {
                     // Colors match in reverse order - flipped
-                    pc.edgePerm[pos] = piece;
-                    pc.edgeOrient[pos] = 1;
+                    cubie.edgePerm[pos] = piece;
+                    cubie.edgeOrient[pos] = 1;
                     break;
                 }
             }
         }
 
-        return pc;
+        return cubie;
     }
 }

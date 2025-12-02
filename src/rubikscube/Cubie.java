@@ -214,29 +214,29 @@ public class Cubie {
      * - Permutation part: 4! = 24 ways to arrange 4 edges
      */
     public short getSlice() {
-        int a = 0, x = 0;
+        int posCoord = 0, count = 0;
         int[] slice = new int[4];
 
         // Find positions of slice edges (pieces 8-11) and encode combinatorially
         for (int j = 11; j >= 0; j--) {
             if (edgePerm[j] >= 8) {
-                a += nCk(11 - j, x + 1);  // Combinatorial encoding of positions
-                slice[3 - x++] = edgePerm[j];
+                posCoord += nCk(11 - j, count + 1);  // Combinatorial encoding of positions
+                slice[3 - count++] = edgePerm[j];
             }
         }
 
         // Encode permutation of the 4 slice edges using factorial number system
-        int b = 0;
+        int permCoord = 0;
         for (int j = 3; j > 0; j--) {
-            int k = 0;
+            int rotations = 0;
             while (slice[j] != j + 8) {
                 rotateLeft(slice, 0, j);
-                k++;
+                rotations++;
             }
-            b = (j + 1) * b + k;
+            permCoord = (j + 1) * permCoord + rotations;
         }
 
-        return (short) (24 * a + b);  // Combine position and permutation
+        return (short) (24 * posCoord + permCoord);  // Combine position and permutation
     }
 
     /**
@@ -246,32 +246,32 @@ public class Cubie {
     public void setSlice(short idx) {
         int[] slice = {8, 9, 10, 11};     // Slice edge pieces
         int[] other = {0, 1, 2, 3, 4, 5, 6, 7};  // Non-slice edges
-        int b = idx % 24;   // Permutation part
-        int a = idx / 24;   // Position part
+        int permCoord = idx % 24;   // Permutation part
+        int posCoord = idx / 24;    // Position part
 
         // Clear all edge positions
         for (int i = 0; i < 12; i++) edgePerm[i] = -1;
 
         // Decode permutation using factorial number system
         for (int j = 1; j < 4; j++) {
-            int k = b % (j + 1);
-            b /= (j + 1);
-            while (k-- > 0) rotateRight(slice, 0, j);
+            int rotations = permCoord % (j + 1);
+            permCoord /= (j + 1);
+            while (rotations-- > 0) rotateRight(slice, 0, j);
         }
 
         // Place slice edges at positions decoded from combinatorial encoding
-        int x = 3;
+        int count = 3;
         for (int j = 0; j <= 11; j++) {
-            if (a - nCk(11 - j, x + 1) >= 0) {
-                edgePerm[j] = slice[3 - x];
-                a -= nCk(11 - j, x-- + 1);
+            if (posCoord - nCk(11 - j, count + 1) >= 0) {
+                edgePerm[j] = slice[3 - count];
+                posCoord -= nCk(11 - j, count-- + 1);
             }
         }
 
         // Fill remaining positions with non-slice edges
-        x = 0;
+        count = 0;
         for (int j = 0; j < 12; j++) {
-            if (edgePerm[j] == -1) edgePerm[j] = other[x++];
+            if (edgePerm[j] == -1) edgePerm[j] = other[count++];
         }
     }
 
@@ -281,57 +281,57 @@ public class Cubie {
      * Uses combinatorial encoding for positions + factorial encoding for permutation.
      */
     public short getCornerPerm() {
-        int a = 0, x = 0;
+        int posCoord = 0, count = 0;
         int[] corners = new int[6];
 
         // Find corners 0-5 and encode their positions combinatorially
         for (int j = 0; j <= 7; j++) {
             if (cornerPerm[j] <= 5) {
-                a += nCk(j, x + 1);
-                corners[x++] = cornerPerm[j];
+                posCoord += nCk(j, count + 1);
+                corners[count++] = cornerPerm[j];
             }
         }
 
         // Encode permutation using factorial number system
-        int b = 0;
+        int permCoord = 0;
         for (int j = 5; j > 0; j--) {
-            int k = 0;
+            int rotations = 0;
             while (corners[j] != j) {
                 rotateLeft(corners, 0, j);
-                k++;
+                rotations++;
             }
-            b = (j + 1) * b + k;
+            permCoord = (j + 1) * permCoord + rotations;
         }
 
-        return (short) (720 * a + b);  // 6! = 720
+        return (short) (720 * posCoord + permCoord);  // 6! = 720
     }
 
     /** Set corner permutation from coordinate. Inverse of getCornerPerm(). */
     public void setCornerPerm(short idx) {
         int[] corners = {0, 1, 2, 3, 4, 5};
         int[] other = {6, 7};
-        int b = idx % 720;
-        int a = idx / 720;
+        int permCoord = idx % 720;
+        int posCoord = idx / 720;
 
         for (int i = 0; i < 8; i++) cornerPerm[i] = -1;
 
         for (int j = 1; j < 6; j++) {
-            int k = b % (j + 1);
-            b /= (j + 1);
-            while (k-- > 0) rotateRight(corners, 0, j);
+            int rotations = permCoord % (j + 1);
+            permCoord /= (j + 1);
+            while (rotations-- > 0) rotateRight(corners, 0, j);
         }
 
-        int x = 5;
+        int count = 5;
         for (int j = 7; j >= 0; j--) {
-            if (a - nCk(j, x + 1) >= 0) {
-                cornerPerm[j] = corners[x];
-                a -= nCk(j, x-- + 1);
+            if (posCoord - nCk(j, count + 1) >= 0) {
+                cornerPerm[j] = corners[count];
+                posCoord -= nCk(j, count-- + 1);
             }
         }
 
-        x = 0;
+        count = 0;
         for (int j = 0; j <= 7; j++) {
-            if (cornerPerm[j] == -1) cornerPerm[j] = other[x++];
+            if (cornerPerm[j] == -1) cornerPerm[j] = other[count++];
         }
     }
 
@@ -341,55 +341,55 @@ public class Cubie {
      * Same encoding scheme as corner permutation.
      */
     public int getUDEdgePerm() {
-        int a = 0, x = 0;
+        int posCoord = 0, count = 0;
         int[] edges = new int[6];
 
         for (int j = 0; j <= 11; j++) {
             if (edgePerm[j] <= 5) {
-                a += nCk(j, x + 1);
-                edges[x++] = edgePerm[j];
+                posCoord += nCk(j, count + 1);
+                edges[count++] = edgePerm[j];
             }
         }
 
-        int b = 0;
+        int permCoord = 0;
         for (int j = 5; j > 0; j--) {
-            int k = 0;
+            int rotations = 0;
             while (edges[j] != j) {
                 rotateLeft(edges, 0, j);
-                k++;
+                rotations++;
             }
-            b = (j + 1) * b + k;
+            permCoord = (j + 1) * permCoord + rotations;
         }
 
-        return 720 * a + b;
+        return 720 * posCoord + permCoord;
     }
 
     /** Set UD edge permutation from coordinate. Inverse of getUDEdgePerm(). */
     public void setUDEdgePerm(int idx) {
         int[] edges = {0, 1, 2, 3, 4, 5};
         int[] other = {6, 7, 8, 9, 10, 11};
-        int b = idx % 720;
-        int a = idx / 720;
+        int permCoord = idx % 720;
+        int posCoord = idx / 720;
 
         for (int i = 0; i < 12; i++) edgePerm[i] = -1;
 
         for (int j = 1; j < 6; j++) {
-            int k = b % (j + 1);
-            b /= (j + 1);
-            while (k-- > 0) rotateRight(edges, 0, j);
+            int rotations = permCoord % (j + 1);
+            permCoord /= (j + 1);
+            while (rotations-- > 0) rotateRight(edges, 0, j);
         }
 
-        int x = 5;
+        int count = 5;
         for (int j = 11; j >= 0; j--) {
-            if (a - nCk(j, x + 1) >= 0) {
-                edgePerm[j] = edges[x];
-                a -= nCk(j, x-- + 1);
+            if (posCoord - nCk(j, count + 1) >= 0) {
+                edgePerm[j] = edges[count];
+                posCoord -= nCk(j, count-- + 1);
             }
         }
 
-        x = 0;
+        count = 0;
         for (int j = 0; j < 12; j++) {
-            if (edgePerm[j] == -1) edgePerm[j] = other[x++];
+            if (edgePerm[j] == -1) edgePerm[j] = other[count++];
         }
     }
 
@@ -399,96 +399,96 @@ public class Cubie {
 
     /** Get coordinate for edges UR, UF, UL (pieces 0, 1, 2). Range: 0-1319. */
     public short getURtoUL() {
-        int a = 0, x = 0;
+        int posCoord = 0, count = 0;
         int[] edges = new int[3];
 
         for (int j = 0; j <= 11; j++) {
             if (edgePerm[j] <= 2) {
-                a += nCk(j, x + 1);
-                edges[x++] = edgePerm[j];
+                posCoord += nCk(j, count + 1);
+                edges[count++] = edgePerm[j];
             }
         }
 
-        int b = 0;
+        int permCoord = 0;
         for (int j = 2; j > 0; j--) {
-            int k = 0;
+            int rotations = 0;
             while (edges[j] != j) {
                 rotateLeft(edges, 0, j);
-                k++;
+                rotations++;
             }
-            b = (j + 1) * b + k;
+            permCoord = (j + 1) * permCoord + rotations;
         }
 
-        return (short) (6 * a + b);  // 3! = 6
+        return (short) (6 * posCoord + permCoord);  // 3! = 6
     }
 
     /** Set edge permutation from URtoUL coordinate. Only sets edges 0-2. */
     public void setURtoUL(short idx) {
         int[] edges = {0, 1, 2};
-        int b = idx % 6;
-        int a = idx / 6;
+        int permCoord = idx % 6;
+        int posCoord = idx / 6;
 
         for (int i = 0; i < 12; i++) edgePerm[i] = 11;  // Mark as unset
 
         for (int j = 1; j < 3; j++) {
-            int k = b % (j + 1);
-            b /= (j + 1);
-            while (k-- > 0) rotateRight(edges, 0, j);
+            int rotations = permCoord % (j + 1);
+            permCoord /= (j + 1);
+            while (rotations-- > 0) rotateRight(edges, 0, j);
         }
 
-        int x = 2;
+        int count = 2;
         for (int j = 11; j >= 0; j--) {
-            if (a - nCk(j, x + 1) >= 0) {
-                edgePerm[j] = edges[x];
-                a -= nCk(j, x-- + 1);
+            if (posCoord - nCk(j, count + 1) >= 0) {
+                edgePerm[j] = edges[count];
+                posCoord -= nCk(j, count-- + 1);
             }
         }
     }
 
     /** Get coordinate for edges UB, DR, DF (pieces 3, 4, 5). Range: 0-1319. */
     public short getUBtoDF() {
-        int a = 0, x = 0;
+        int posCoord = 0, count = 0;
         int[] edges = new int[3];
 
         for (int j = 0; j <= 11; j++) {
             if (edgePerm[j] >= 3 && edgePerm[j] <= 5) {
-                a += nCk(j, x + 1);
-                edges[x++] = edgePerm[j];
+                posCoord += nCk(j, count + 1);
+                edges[count++] = edgePerm[j];
             }
         }
 
-        int b = 0;
+        int permCoord = 0;
         for (int j = 2; j > 0; j--) {
-            int k = 0;
+            int rotations = 0;
             while (edges[j] != 3 + j) {
                 rotateLeft(edges, 0, j);
-                k++;
+                rotations++;
             }
-            b = (j + 1) * b + k;
+            permCoord = (j + 1) * permCoord + rotations;
         }
 
-        return (short) (6 * a + b);
+        return (short) (6 * posCoord + permCoord);
     }
 
     /** Set edge permutation from UBtoDF coordinate. Only sets edges 3-5. */
     public void setUBtoDF(short idx) {
         int[] edges = {3, 4, 5};
-        int b = idx % 6;
-        int a = idx / 6;
+        int permCoord = idx % 6;
+        int posCoord = idx / 6;
 
         for (int i = 0; i < 12; i++) edgePerm[i] = 11;
 
         for (int j = 1; j < 3; j++) {
-            int k = b % (j + 1);
-            b /= (j + 1);
-            while (k-- > 0) rotateRight(edges, 0, j);
+            int rotations = permCoord % (j + 1);
+            permCoord /= (j + 1);
+            while (rotations-- > 0) rotateRight(edges, 0, j);
         }
 
-        int x = 2;
+        int count = 2;
         for (int j = 11; j >= 0; j--) {
-            if (a - nCk(j, x + 1) >= 0) {
-                edgePerm[j] = edges[x];
-                a -= nCk(j, x-- + 1);
+            if (posCoord - nCk(j, count + 1) >= 0) {
+                edgePerm[j] = edges[count];
+                posCoord -= nCk(j, count-- + 1);
             }
         }
     }
@@ -499,20 +499,20 @@ public class Cubie {
      * Returns -1 if the coordinates conflict (shouldn't happen with valid inputs).
      */
     public static int mergeURtoULandUBtoDF(short urToUl, short ubToDf) {
-        Cubie a = new Cubie();
-        Cubie b = new Cubie();
-        a.setURtoUL(urToUl);
-        b.setUBtoDF(ubToDf);
+        Cubie cubeA = new Cubie();
+        Cubie cubeB = new Cubie();
+        cubeA.setURtoUL(urToUl);
+        cubeB.setUBtoDF(ubToDf);
 
-        // Merge: copy edges from 'a' into 'b' where 'b' is unset
+        // Merge: copy edges from cubeA into cubeB where cubeB is unset
         for (int i = 0; i < 8; i++) {
-            if (a.edgePerm[i] != 11) {
-                if (b.edgePerm[i] != 11) return -1;  // Both set = conflict
-                b.edgePerm[i] = a.edgePerm[i];
+            if (cubeA.edgePerm[i] != 11) {
+                if (cubeB.edgePerm[i] != 11) return -1;  // Both set = conflict
+                cubeB.edgePerm[i] = cubeA.edgePerm[i];
             }
         }
 
-        return b.getUDEdgePerm();
+        return cubeB.getUDEdgePerm();
     }
 
     /**
@@ -521,14 +521,14 @@ public class Cubie {
      * corner parity == edge parity.
      */
     public short cornerParity() {
-        int s = 0;
+        int inversions = 0;
         // Count inversions: pairs (i,j) where i < j but perm[i] > perm[j]
         for (int i = 7; i >= 1; i--) {
             for (int j = i - 1; j >= 0; j--) {
-                if (cornerPerm[j] > cornerPerm[i]) s++;
+                if (cornerPerm[j] > cornerPerm[i]) inversions++;
             }
         }
-        return (short) (s % 2);
+        return (short) (inversions % 2);
     }
 
     /**
@@ -536,13 +536,13 @@ public class Cubie {
      * Same algorithm as corner parity.
      */
     public short edgeParity() {
-        int s = 0;
+        int inversions = 0;
         for (int i = 11; i >= 1; i--) {
             for (int j = i - 1; j >= 0; j--) {
-                if (edgePerm[j] > edgePerm[i]) s++;
+                if (edgePerm[j] > edgePerm[i]) inversions++;
             }
         }
-        return (short) (s % 2);
+        return (short) (inversions % 2);
     }
 
     /**
@@ -614,17 +614,17 @@ public class Cubie {
         return result;
     }
 
-    /** Rotate array elements left within range [l,r]: arr[l] moves to arr[r] */
-    private static void rotateLeft(int[] arr, int l, int r) {
-        int temp = arr[l];
-        for (int i = l; i < r; i++) arr[i] = arr[i + 1];
-        arr[r] = temp;
+    /** Rotate array elements left within range [left,right]: arr[left] moves to arr[right] */
+    private static void rotateLeft(int[] arr, int left, int right) {
+        int temp = arr[left];
+        for (int i = left; i < right; i++) arr[i] = arr[i + 1];
+        arr[right] = temp;
     }
 
-    /** Rotate array elements right within range [l,r]: arr[r] moves to arr[l] */
-    private static void rotateRight(int[] arr, int l, int r) {
-        int temp = arr[r];
-        for (int i = r; i > l; i--) arr[i] = arr[i - 1];
-        arr[l] = temp;
+    /** Rotate array elements right within range [left,right]: arr[right] moves to arr[left] */
+    private static void rotateRight(int[] arr, int left, int right) {
+        int temp = arr[right];
+        for (int i = right; i > left; i--) arr[i] = arr[i - 1];
+        arr[left] = temp;
     }
 }

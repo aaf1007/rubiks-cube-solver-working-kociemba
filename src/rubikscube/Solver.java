@@ -9,46 +9,29 @@ import java.lang.invoke.MethodHandles;
 public class Solver {
 
     public static void main(String[] args) throws IOException {
-//      System.out.println("number of arguments: " + args.length);
-//      for (int i = 0; i < args.length; i++) {
-//          System.out.println(args[i]);
-//      }
         if (args.length < 2) {
             System.out.println("File names are not specified");
             System.out.println("usage: java " + MethodHandles.lookup().lookupClass().getName() + " input_file output_file");
             return;
         }
 
-        //File input = new File(args[0]);
-        String Input_Filename = args[0];
-        RubiksCube StartCube = new RubiksCube(Input_Filename);
-        Cubie CC = StartCube.toCubie();
-
-        // Verify cube is valid
-        // int verify = CC.verify();
-        // if (verify != 0) {
-        //     System.out.println("Invalid cube: Error " + Math.abs(verify));
-        //     return;
-        // }
+        String inputFilename = args[0];
+        RubiksCube rubiksCube = new RubiksCube(inputFilename);
+        Cubie cubie = rubiksCube.toCubie();
 
         // Solve using two-phase algorithm
-        String solution = TwoPhase.solve(CC, 25, 10);
-
-        if (solution.startsWith("Error")) {
-            System.out.println("Could not solve: " + solution);
-            return;
-        }
+        String solution = TwoPhase.solve(cubie, 25, 10);
 
         System.out.println("\u001B[32mSolution: " + solution + "\u001B[0m");
 
         for (int i = 0; i < solution.length(); i++) {
-            int move = charToMove(solution.charAt(i));  // char → int
+            int move = charToMove(solution.charAt(i));
             if (move >= 0) {
-                CC.applyMove(move);  // now it's an int
+                cubie.applyMove(move);
             }
         }
         // Verify Solution
-        System.out.println("Solved: " + CC.isSolved());
+        System.out.println("Solved: " + cubie.isSolved());
 
         // Write solution to output file
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(args[1]))) {
@@ -57,30 +40,11 @@ public class Solver {
     }
 
     /**
-     * Verify solution by applying moves to original cube and checking if solved.
-     * Solution format: repeated letters (e.g., UUU = U', UU = U2)
-     */
-    // private static boolean verifySolution(String filename, String solution) throws IOException {
-    //     RubiksCube cube = new RubiksCube(filename);
-    //     Cubie pc = cube.toCubie();
-
-    //     // Each character is a single quarter turn
-    //     for (int i = 0; i < solution.length(); i++) {
-    //         int move = charToMove(solution.charAt(i));
-    //         if (move >= 0) {
-    //             pc.applyMove(move);
-    //         }
-    //     }
-
-    //     return pc.isSolved();
-    // }
-
-    /**
-     * Convert face character to quarter-turn move index.
+     * Convert face character to turn move index
      */
     private static int charToMove(char c) {
         switch (c) {
-            case 'U': return 0;  // U (quarter turn)
+            case 'U': return 0;  
             case 'R': return 3;
             case 'F': return 6;
             case 'D': return 9;
