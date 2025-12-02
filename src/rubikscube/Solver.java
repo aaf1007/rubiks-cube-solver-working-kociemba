@@ -42,7 +42,7 @@ public class Solver {
             return;
         }
 
-        System.out.println("Solution: " + solution);
+        System.out.println("\u001B[32mSolution: " + solution + "\u001B[0m");
 
         for (int i = 0; i < solution.length(); i++) {
             int move = charToMove(solution.charAt(i));  // char → int
