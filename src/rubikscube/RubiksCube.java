@@ -7,7 +7,7 @@ import java.io.*;
  *
  * This class handles the input format: a text file with 54 colored stickers.
  * It parses the file and converts the sticker colors into a piece-level
- * representation (PieceCube) that the solver can use.
+ * representation (Cubie) that the solver can use.
  *
  * The cube is unfolded in the file as:
  *       OOO          (Up face)
@@ -23,7 +23,7 @@ import java.io.*;
  * Face indices (0-5): U=0, R=1, F=2, D=3, L=4, B=5
  * Sticker indices per face (0-8): reading order top-left to bottom-right
  */
-public class StickerCube {
+public class RubiksCube {
 
     // Face/color constants - these map to positions in the stickers array
     // Colors in your scheme: O=Orange(Up), B=Blue(Right), W=White(Front),
@@ -89,7 +89,7 @@ public class StickerCube {
     /**
      * Default constructor: creates a solved cube where each face has its own color.
      */
-    public StickerCube() {
+    public RubiksCube() {
         for (int face = 0; face < 6; face++) {
             for (int i = 0; i < 9; i++) {
                 stickers[face * 9 + i] = face;
@@ -108,7 +108,7 @@ public class StickerCube {
      * @param filename Path to the input file
      * @throws IOException if file can't be read or has wrong format
      */
-    public StickerCube(String filename) throws IOException {
+    public RubiksCube(String filename) throws IOException {
         BufferedReader reader = new BufferedReader(new FileReader(filename));
         String[] lines = new String[9];
 
@@ -173,10 +173,10 @@ public class StickerCube {
      * 3. Which of the 12 edge pieces is at each edge position
      * 4. Whether each edge is flipped (orientation 0 or 1)
      *
-     * @return A PieceCube representing the same cube state
+     * @return A Cubie representing the same cube state
      */
-    public PieceCube toPieceCube() {
-        PieceCube pc = new PieceCube();
+    public Cubie toCubie() {
+        Cubie pc = new Cubie();
 
         // Process each of the 8 corner positions
         for (int pos = 0; pos < 8; pos++) {

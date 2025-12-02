@@ -77,7 +77,7 @@ public class Tables {
      * and records the resulting coordinate. The 4th application restores the original.
      */
     private static void initMoveTables() {
-        PieceCube cube = new PieceCube();
+        Cubie cube = new Cubie();
 
         // Twist move table: how corner orientations change with each move
         for (short i = 0; i < N_TWIST; i++) {
@@ -171,7 +171,7 @@ public class Tables {
     private static void initMergeTable() {
         for (short i = 0; i < 336; i++) {
             for (short j = 0; j < 336; j++) {
-                mergeURtoULandUBtoDF[i][j] = (short) PieceCube.mergeURtoULandUBtoDF(i, j);
+                mergeURtoULandUBtoDF[i][j] = (short) Cubie.mergeURtoULandUBtoDF(i, j);
             }
         }
     }

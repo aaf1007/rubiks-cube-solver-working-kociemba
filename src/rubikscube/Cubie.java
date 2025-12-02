@@ -15,7 +15,7 @@ package rubikscube;
  *
  * Moves are applied by permutation composition with precomputed move templates.
  */
-public class PieceCube {
+public class Cubie {
 
     // Which corner piece occupies each position (solved = identity permutation)
     public int[] cornerPerm = {0, 1, 2, 3, 4, 5, 6, 7};
@@ -27,9 +27,9 @@ public class PieceCube {
     // Orientation of each edge: 0=correct, 1=flipped
     public byte[] edgeOrient = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-    // Move templates: one PieceCube for each face's quarter turn
+    // Move templates: one Cubie for each face's quarter turn
     // To apply U2, we apply MOVE_CUBES[0] twice; for U', apply it 3 times
-    private static final PieceCube[] MOVE_CUBES = new PieceCube[6];
+    private static final Cubie[] MOVE_CUBES = new Cubie[6];
 
     // Corner permutation templates for each face's clockwise quarter turn
     // Read as: after U move, position 0 gets the piece from position 3, etc.
@@ -77,7 +77,7 @@ public class PieceCube {
     // Build move templates from the static arrays
     static {
         for (int m = 0; m < 6; m++) {
-            MOVE_CUBES[m] = new PieceCube();
+            MOVE_CUBES[m] = new Cubie();
             MOVE_CUBES[m].cornerPerm = CORNER_PERM_MOVES[m].clone();
             MOVE_CUBES[m].cornerOrient = CORNER_ORIENT_MOVES[m].clone();
             MOVE_CUBES[m].edgePerm = EDGE_PERM_MOVES[m].clone();
@@ -86,7 +86,7 @@ public class PieceCube {
     }
 
     /** Default constructor: creates a solved cube (identity permutation, zero orientation) */
-    public PieceCube() {}
+    public Cubie() {}
 
     /**
      * Apply a move to the cube by composing with the move template.
@@ -113,7 +113,7 @@ public class PieceCube {
      * New permutation: follow both mappings
      * New orientation: sum of orientations (mod 3 for corners)
      */
-    private void multiplyCorners(PieceCube other) {
+    private void multiplyCorners(Cubie other) {
         int[] newPerm = new int[8];
         byte[] newOrient = new byte[8];
 
@@ -132,7 +132,7 @@ public class PieceCube {
      * Compose this cube's edge state with another cube (permutation multiplication).
      * Same logic as corners, but orientation is mod 2 (flip/no flip).
      */
-    private void multiplyEdges(PieceCube other) {
+    private void multiplyEdges(Cubie other) {
         int[] newPerm = new int[12];
         byte[] newOrient = new byte[12];
 
@@ -499,8 +499,8 @@ public class PieceCube {
      * Returns -1 if the coordinates conflict (shouldn't happen with valid inputs).
      */
     public static int mergeURtoULandUBtoDF(short urToUl, short ubToDf) {
-        PieceCube a = new PieceCube();
-        PieceCube b = new PieceCube();
+        Cubie a = new Cubie();
+        Cubie b = new Cubie();
         a.setURtoUL(urToUl);
         b.setUBtoDF(ubToDf);
 
