@@ -1,69 +1,81 @@
 package rubikscube;
 
 /**
- * Piece-level cube representation using permutation and orientation arrays.
- * 
- * Corners (0-7): URF, UFL, ULB, UBR, DFR, DLF, DBL, DRB
- * Edges (0-11): UR, UF, UL, UB, DR, DF, DL, DB, FR, FL, BL, BR
- * 
- * Each move is applied by composing with a template permutation.
+ * Piece-level representation of a Rubik's Cube.
+ *
+ * The cube is represented by 4 arrays:
+ * - cornerPerm[8]: which corner piece is at each position (0-7)
+ * - cornerOrient[8]: how each corner is twisted (0=correct, 1=CW, 2=CCW)
+ * - edgePerm[12]: which edge piece is at each position (0-11)
+ * - edgeOrient[12]: whether each edge is flipped (0=correct, 1=flipped)
+ *
+ * Corner positions: URF=0, UFL=1, ULB=2, UBR=3 (top), DFR=4, DLF=5, DBL=6, DRB=7 (bottom)
+ * Edge positions: UR=0, UF=1, UL=2, UB=3 (top), DR=4, DF=5, DL=6, DB=7 (bottom),
+ *                 FR=8, FL=9, BL=10, BR=11 (E-slice/middle layer)
+ *
+ * Moves are applied by permutation composition with precomputed move templates.
  */
 public class PieceCube {
 
-    // Corner positions: URF=0, UFL=1, ULB=2, UBR=3, DFR=4, DLF=5, DBL=6, DRB=7
+    // Which corner piece occupies each position (solved = identity permutation)
     public int[] cornerPerm = {0, 1, 2, 3, 4, 5, 6, 7};
+    // Orientation of each corner: 0=no twist, 1=clockwise twist, 2=counter-clockwise
     public byte[] cornerOrient = {0, 0, 0, 0, 0, 0, 0, 0};
 
-    // Edge positions: UR=0, UF=1, UL=2, UB=3, DR=4, DF=5, DL=6, DB=7, FR=8, FL=9, BL=10, BR=11
+    // Which edge piece occupies each position (solved = identity)
     public int[] edgePerm = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    // Orientation of each edge: 0=correct, 1=flipped
     public byte[] edgeOrient = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-    // Move templates: [move_index] = PieceCube representing that single move
-    // Move indices: U=0, U2=1, U'=2, R=3, R2=4, R'=5, F=6, F2=7, F'=8, D=9, D2=10, D'=11, L=12, L2=13, L'=14, B=15, B2=16, B'=17
+    // Move templates: one PieceCube for each face's quarter turn
+    // To apply U2, we apply MOVE_CUBES[0] twice; for U', apply it 3 times
     private static final PieceCube[] MOVE_CUBES = new PieceCube[6];
 
-    // Corner permutation for each basic move (clockwise quarter turn)
+    // Corner permutation templates for each face's clockwise quarter turn
+    // Read as: after U move, position 0 gets the piece from position 3, etc.
     private static final int[][] CORNER_PERM_MOVES = {
-        {3, 0, 1, 2, 4, 5, 6, 7},  // U
-        {4, 1, 2, 0, 7, 5, 6, 3},  // R
-        {1, 5, 2, 3, 0, 4, 6, 7},  // F
-        {0, 1, 2, 3, 5, 6, 7, 4},  // D
-        {0, 2, 6, 3, 4, 1, 5, 7},  // L
-        {0, 1, 3, 7, 4, 5, 2, 6}   // B
+        {3, 0, 1, 2, 4, 5, 6, 7},  // U: cycles top 4 corners
+        {4, 1, 2, 0, 7, 5, 6, 3},  // R: cycles right 4 corners
+        {1, 5, 2, 3, 0, 4, 6, 7},  // F: cycles front 4 corners
+        {0, 1, 2, 3, 5, 6, 7, 4},  // D: cycles bottom 4 corners
+        {0, 2, 6, 3, 4, 1, 5, 7},  // L: cycles left 4 corners
+        {0, 1, 3, 7, 4, 5, 2, 6}   // B: cycles back 4 corners
     };
 
-    // Corner orientation change for each basic move
+    // Corner orientation change for each move
+    // U and D don't twist corners; R, F, L, B twist the corners they move
     private static final byte[][] CORNER_ORIENT_MOVES = {
-        {0, 0, 0, 0, 0, 0, 0, 0},  // U
-        {2, 0, 0, 1, 1, 0, 0, 2},  // R
-        {1, 2, 0, 0, 2, 1, 0, 0},  // F
-        {0, 0, 0, 0, 0, 0, 0, 0},  // D
-        {0, 1, 2, 0, 0, 2, 1, 0},  // L
-        {0, 0, 1, 2, 0, 0, 2, 1}   // B
+        {0, 0, 0, 0, 0, 0, 0, 0},  // U: no twist
+        {2, 0, 0, 1, 1, 0, 0, 2},  // R: twists 4 corners
+        {1, 2, 0, 0, 2, 1, 0, 0},  // F: twists 4 corners
+        {0, 0, 0, 0, 0, 0, 0, 0},  // D: no twist
+        {0, 1, 2, 0, 0, 2, 1, 0},  // L: twists 4 corners
+        {0, 0, 1, 2, 0, 0, 2, 1}   // B: twists 4 corners
     };
 
-    // Edge permutation for each basic move
+    // Edge permutation templates for each face's clockwise quarter turn
     private static final int[][] EDGE_PERM_MOVES = {
-        {3, 0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11},   // U
-        {8, 1, 2, 3, 11, 5, 6, 7, 4, 9, 10, 0},   // R
-        {0, 9, 2, 3, 4, 8, 6, 7, 1, 5, 10, 11},   // F
-        {0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10, 11},   // D
-        {0, 1, 10, 3, 4, 5, 9, 7, 8, 2, 6, 11},   // L
-        {0, 1, 2, 11, 4, 5, 6, 10, 8, 9, 3, 7}    // B
+        {3, 0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11},   // U: cycles UR,UF,UL,UB
+        {8, 1, 2, 3, 11, 5, 6, 7, 4, 9, 10, 0},   // R: cycles UR,FR,DR,BR
+        {0, 9, 2, 3, 4, 8, 6, 7, 1, 5, 10, 11},   // F: cycles UF,FL,DF,FR
+        {0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10, 11},   // D: cycles DR,DF,DL,DB
+        {0, 1, 10, 3, 4, 5, 9, 7, 8, 2, 6, 11},   // L: cycles UL,BL,DL,FL
+        {0, 1, 2, 11, 4, 5, 6, 10, 8, 9, 3, 7}    // B: cycles UB,BR,DB,BL
     };
 
-    // Edge orientation change for each basic move
+    // Edge orientation change for each move
+    // F and B flip edges (change orientation); U, R, D, L don't
     private static final byte[][] EDGE_ORIENT_MOVES = {
-        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // U
-        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // R
-        {0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0},  // F
-        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // D
-        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L
-        {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1}   // B
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // U: no flip
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // R: no flip
+        {0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0},  // F: flips 4 edges
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // D: no flip
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L: no flip
+        {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1}   // B: flips 4 edges
     };
 
+    // Build move templates from the static arrays
     static {
-        // Initialize move templates
         for (int m = 0; m < 6; m++) {
             MOVE_CUBES[m] = new PieceCube();
             MOVE_CUBES[m].cornerPerm = CORNER_PERM_MOVES[m].clone();
@@ -73,16 +85,21 @@ public class PieceCube {
         }
     }
 
+    /** Default constructor: creates a solved cube (identity permutation, zero orientation) */
     public PieceCube() {}
 
     /**
-     * Apply a move by composing with the move template.
-     * @param move 0-17 representing U, U2, U', R, R2, R', F, F2, F', D, D2, D', L, L2, L', B, B2, B'
+     * Apply a move to the cube by composing with the move template.
+     *
+     * @param move Move index 0-17:
+     *             U=0, U2=1, U'=2, R=3, R2=4, R'=5, F=6, F2=7, F'=8,
+     *             D=9, D2=10, D'=11, L=12, L2=13, L'=14, B=15, B2=16, B'=17
      */
     public void applyMove(int move) {
-        int face = move / 3;      // Which face (0-5)
-        int turns = move % 3 + 1; // How many quarter turns (1, 2, or 3)
+        int face = move / 3;      // Which face (0=U, 1=R, 2=F, 3=D, 4=L, 5=B)
+        int turns = move % 3 + 1; // Quarter turns: 1=90°, 2=180°, 3=270°
 
+        // Apply the quarter-turn template 'turns' times
         for (int t = 0; t < turns; t++) {
             multiplyCorners(MOVE_CUBES[face]);
             multiplyEdges(MOVE_CUBES[face]);
@@ -90,14 +107,20 @@ public class PieceCube {
     }
 
     /**
-     * Multiply corner permutation and orientation with another cube.
+     * Compose this cube's corner state with another cube (permutation multiplication).
+     * The result represents applying 'other' after 'this'.
+     *
+     * New permutation: follow both mappings
+     * New orientation: sum of orientations (mod 3 for corners)
      */
     private void multiplyCorners(PieceCube other) {
         int[] newPerm = new int[8];
         byte[] newOrient = new byte[8];
 
         for (int i = 0; i < 8; i++) {
+            // Position i gets the piece that 'other' puts there, traced through 'this'
             newPerm[i] = cornerPerm[other.cornerPerm[i]];
+            // Orientation combines: original twist + twist from the move
             newOrient[i] = (byte) ((cornerOrient[other.cornerPerm[i]] + other.cornerOrient[i]) % 3);
         }
 
@@ -106,7 +129,8 @@ public class PieceCube {
     }
 
     /**
-     * Multiply edge permutation and orientation with another cube.
+     * Compose this cube's edge state with another cube (permutation multiplication).
+     * Same logic as corners, but orientation is mod 2 (flip/no flip).
      */
     private void multiplyEdges(PieceCube other) {
         int[] newPerm = new int[12];
@@ -121,10 +145,14 @@ public class PieceCube {
         edgeOrient = newOrient;
     }
 
-    // ==================== Coordinate Extraction ====================
+    // Coordinate extraction and setting methods
+    // These convert between the 4-array representation and integer coordinates
+    // used by the move/pruning tables.
 
     /**
-     * Corner orientation coordinate: 0 to 2186 (3^7 - 1)
+     * Get corner orientation (twist) coordinate: 0 to 2186.
+     * Encodes orientations of first 7 corners in base 3.
+     * The 8th corner's orientation is determined by the constraint: sum = 0 mod 3.
      */
     public short getTwist() {
         short twist = 0;
@@ -134,6 +162,10 @@ public class PieceCube {
         return twist;
     }
 
+    /**
+     * Set corner orientations from twist coordinate.
+     * Decodes base-3 number and computes 8th orientation from parity constraint.
+     */
     public void setTwist(short twist) {
         int parity = 0;
         for (int i = 6; i >= 0; i--) {
@@ -141,11 +173,14 @@ public class PieceCube {
             parity += cornerOrient[i];
             twist /= 3;
         }
+        // 8th corner orientation makes total sum divisible by 3
         cornerOrient[7] = (byte) ((3 - parity % 3) % 3);
     }
 
     /**
-     * Edge orientation coordinate: 0 to 2047 (2^11 - 1)
+     * Get edge orientation (flip) coordinate: 0 to 2047.
+     * Encodes orientations of first 11 edges in base 2.
+     * The 12th edge's orientation is determined by the constraint: sum = 0 mod 2.
      */
     public short getFlip() {
         short flip = 0;
@@ -155,6 +190,10 @@ public class PieceCube {
         return flip;
     }
 
+    /**
+     * Set edge orientations from flip coordinate.
+     * Decodes binary number and computes 12th orientation from parity constraint.
+     */
     public void setFlip(short flip) {
         int parity = 0;
         for (int i = 10; i >= 0; i--) {
@@ -166,22 +205,27 @@ public class PieceCube {
     }
 
     /**
-     * E-slice edge positions: 0 to 11879
-     * Encodes which positions contain FR, FL, BL, BR edges and their order.
+     * Get E-slice coordinate: 0 to 11879.
+     * Encodes both which 4 positions hold E-slice edges (FR, FL, BL, BR = pieces 8-11)
+     * AND their permutation within those positions.
+     *
+     * The coordinate = 24 * (combinatorial position) + (permutation within 0-23)
+     * - Position part: C(12,4) = 495 ways to choose 4 positions from 12
+     * - Permutation part: 4! = 24 ways to arrange 4 edges
      */
     public short getSlice() {
         int a = 0, x = 0;
         int[] slice = new int[4];
 
-        // Find positions of slice edges (8, 9, 10, 11) from right to left
+        // Find positions of slice edges (pieces 8-11) and encode combinatorially
         for (int j = 11; j >= 0; j--) {
             if (edgePerm[j] >= 8) {
-                a += nCk(11 - j, x + 1);
+                a += nCk(11 - j, x + 1);  // Combinatorial encoding of positions
                 slice[3 - x++] = edgePerm[j];
             }
         }
 
-        // Encode permutation of slice edges
+        // Encode permutation of the 4 slice edges using factorial number system
         int b = 0;
         for (int j = 3; j > 0; j--) {
             int k = 0;
@@ -192,26 +236,30 @@ public class PieceCube {
             b = (j + 1) * b + k;
         }
 
-        return (short) (24 * a + b);
+        return (short) (24 * a + b);  // Combine position and permutation
     }
 
+    /**
+     * Set edge permutation from slice coordinate.
+     * Decodes the coordinate into positions and permutation, then places edges.
+     */
     public void setSlice(short idx) {
-        int[] slice = {8, 9, 10, 11};
-        int[] other = {0, 1, 2, 3, 4, 5, 6, 7};
-        int b = idx % 24;
-        int a = idx / 24;
+        int[] slice = {8, 9, 10, 11};     // Slice edge pieces
+        int[] other = {0, 1, 2, 3, 4, 5, 6, 7};  // Non-slice edges
+        int b = idx % 24;   // Permutation part
+        int a = idx / 24;   // Position part
 
-        // Clear edges
+        // Clear all edge positions
         for (int i = 0; i < 12; i++) edgePerm[i] = -1;
 
-        // Decode permutation
+        // Decode permutation using factorial number system
         for (int j = 1; j < 4; j++) {
             int k = b % (j + 1);
             b /= (j + 1);
             while (k-- > 0) rotateRight(slice, 0, j);
         }
 
-        // Place slice edges
+        // Place slice edges at positions decoded from combinatorial encoding
         int x = 3;
         for (int j = 0; j <= 11; j++) {
             if (a - nCk(11 - j, x + 1) >= 0) {
@@ -220,7 +268,7 @@ public class PieceCube {
             }
         }
 
-        // Fill remaining with non-slice edges
+        // Fill remaining positions with non-slice edges
         x = 0;
         for (int j = 0; j < 12; j++) {
             if (edgePerm[j] == -1) edgePerm[j] = other[x++];
@@ -228,12 +276,15 @@ public class PieceCube {
     }
 
     /**
-     * Corner permutation coordinate for first 6 corners: 0 to 20159
+     * Get corner permutation coordinate for phase 2: 0 to 20159.
+     * Encodes position and order of corners 0-5 (the other 2 are determined by parity).
+     * Uses combinatorial encoding for positions + factorial encoding for permutation.
      */
     public short getCornerPerm() {
         int a = 0, x = 0;
         int[] corners = new int[6];
 
+        // Find corners 0-5 and encode their positions combinatorially
         for (int j = 0; j <= 7; j++) {
             if (cornerPerm[j] <= 5) {
                 a += nCk(j, x + 1);
@@ -241,6 +292,7 @@ public class PieceCube {
             }
         }
 
+        // Encode permutation using factorial number system
         int b = 0;
         for (int j = 5; j > 0; j--) {
             int k = 0;
@@ -251,9 +303,10 @@ public class PieceCube {
             b = (j + 1) * b + k;
         }
 
-        return (short) (720 * a + b);
+        return (short) (720 * a + b);  // 6! = 720
     }
 
+    /** Set corner permutation from coordinate. Inverse of getCornerPerm(). */
     public void setCornerPerm(short idx) {
         int[] corners = {0, 1, 2, 3, 4, 5};
         int[] other = {6, 7};
@@ -283,7 +336,9 @@ public class PieceCube {
     }
 
     /**
-     * UD edge permutation coordinate: 0 to 20159
+     * Get UD edge permutation coordinate for phase 2: 0 to 20159.
+     * Encodes position and order of edges 0-5 (the UD layer edges).
+     * Same encoding scheme as corner permutation.
      */
     public int getUDEdgePerm() {
         int a = 0, x = 0;
@@ -309,6 +364,7 @@ public class PieceCube {
         return 720 * a + b;
     }
 
+    /** Set UD edge permutation from coordinate. Inverse of getUDEdgePerm(). */
     public void setUDEdgePerm(int idx) {
         int[] edges = {0, 1, 2, 3, 4, 5};
         int[] other = {6, 7, 8, 9, 10, 11};
@@ -337,7 +393,11 @@ public class PieceCube {
         }
     }
 
-    // Helper edge coordinates for efficient phase 2 setup
+    // Helper edge coordinates for efficient phase 2 computation
+    // Instead of computing full UD edge perm during search, we track two smaller
+    // coordinates and merge them only when needed (using precomputed merge table).
+
+    /** Get coordinate for edges UR, UF, UL (pieces 0, 1, 2). Range: 0-1319. */
     public short getURtoUL() {
         int a = 0, x = 0;
         int[] edges = new int[3];
@@ -359,15 +419,16 @@ public class PieceCube {
             b = (j + 1) * b + k;
         }
 
-        return (short) (6 * a + b);
+        return (short) (6 * a + b);  // 3! = 6
     }
 
+    /** Set edge permutation from URtoUL coordinate. Only sets edges 0-2. */
     public void setURtoUL(short idx) {
         int[] edges = {0, 1, 2};
         int b = idx % 6;
         int a = idx / 6;
 
-        for (int i = 0; i < 12; i++) edgePerm[i] = 11; // Invalid marker
+        for (int i = 0; i < 12; i++) edgePerm[i] = 11;  // Mark as unset
 
         for (int j = 1; j < 3; j++) {
             int k = b % (j + 1);
@@ -384,6 +445,7 @@ public class PieceCube {
         }
     }
 
+    /** Get coordinate for edges UB, DR, DF (pieces 3, 4, 5). Range: 0-1319. */
     public short getUBtoDF() {
         int a = 0, x = 0;
         int[] edges = new int[3];
@@ -408,6 +470,7 @@ public class PieceCube {
         return (short) (6 * a + b);
     }
 
+    /** Set edge permutation from UBtoDF coordinate. Only sets edges 3-5. */
     public void setUBtoDF(short idx) {
         int[] edges = {3, 4, 5};
         int b = idx % 6;
@@ -431,7 +494,9 @@ public class PieceCube {
     }
 
     /**
-     * Merge URtoUL and UBtoDF into full UDEdgePerm.
+     * Merge URtoUL and UBtoDF helper coordinates into full UDEdgePerm.
+     * Creates two partial cubes, combines their edge info, and extracts the result.
+     * Returns -1 if the coordinates conflict (shouldn't happen with valid inputs).
      */
     public static int mergeURtoULandUBtoDF(short urToUl, short ubToDf) {
         PieceCube a = new PieceCube();
@@ -439,9 +504,10 @@ public class PieceCube {
         a.setURtoUL(urToUl);
         b.setUBtoDF(ubToDf);
 
+        // Merge: copy edges from 'a' into 'b' where 'b' is unset
         for (int i = 0; i < 8; i++) {
             if (a.edgePerm[i] != 11) {
-                if (b.edgePerm[i] != 11) return -1; // Collision
+                if (b.edgePerm[i] != 11) return -1;  // Both set = conflict
                 b.edgePerm[i] = a.edgePerm[i];
             }
         }
@@ -450,10 +516,13 @@ public class PieceCube {
     }
 
     /**
-     * Corner parity: 0 (even) or 1 (odd)
+     * Compute corner permutation parity: 0 (even) or 1 (odd).
+     * Counts inversions in the permutation. A valid cube must have
+     * corner parity == edge parity.
      */
     public short cornerParity() {
         int s = 0;
+        // Count inversions: pairs (i,j) where i < j but perm[i] > perm[j]
         for (int i = 7; i >= 1; i--) {
             for (int j = i - 1; j >= 0; j--) {
                 if (cornerPerm[j] > cornerPerm[i]) s++;
@@ -463,7 +532,8 @@ public class PieceCube {
     }
 
     /**
-     * Edge parity: 0 (even) or 1 (odd)
+     * Compute edge permutation parity: 0 (even) or 1 (odd).
+     * Same algorithm as corner parity.
      */
     public short edgeParity() {
         int s = 0;
@@ -476,7 +546,8 @@ public class PieceCube {
     }
 
     /**
-     * Check if cube is solved.
+     * Check if the cube is in the solved state.
+     * Solved means identity permutation and zero orientation for all pieces.
      */
     public boolean isSolved() {
         for (int i = 0; i < 8; i++) {
@@ -489,42 +560,53 @@ public class PieceCube {
     }
 
     /**
-     * Verify cube validity. Returns 0 if OK, negative error code otherwise.
+     * Verify that the cube state is valid (physically possible to reach from solved).
+     *
+     * @return 0 if valid, negative error code otherwise:
+     *         -2: Missing or duplicate edge
+     *         -3: Edge orientation sum not divisible by 2
+     *         -4: Missing or duplicate corner
+     *         -5: Corner orientation sum not divisible by 3
+     *         -6: Corner and edge parity don't match
      */
     public int verify() {
-        // Check edge permutation
+        // Each edge piece must appear exactly once
         int[] edgeCount = new int[12];
         for (int i = 0; i < 12; i++) edgeCount[edgePerm[i]]++;
         for (int i = 0; i < 12; i++) {
-            if (edgeCount[i] != 1) return -2; // Missing/duplicate edge
+            if (edgeCount[i] != 1) return -2;
         }
 
-        // Check edge orientation sum (must be even)
+        // Edge orientation sum must be even (physical constraint)
         int sum = 0;
         for (int i = 0; i < 12; i++) sum += edgeOrient[i];
-        if (sum % 2 != 0) return -3; // Flip error
+        if (sum % 2 != 0) return -3;
 
-        // Check corner permutation
+        // Each corner piece must appear exactly once
         int[] cornerCount = new int[8];
         for (int i = 0; i < 8; i++) cornerCount[cornerPerm[i]]++;
         for (int i = 0; i < 8; i++) {
-            if (cornerCount[i] != 1) return -4; // Missing/duplicate corner
+            if (cornerCount[i] != 1) return -4;
         }
 
-        // Check corner orientation sum (must be divisible by 3)
+        // Corner orientation sum must be divisible by 3 (physical constraint)
         sum = 0;
         for (int i = 0; i < 8; i++) sum += cornerOrient[i];
-        if (sum % 3 != 0) return -5; // Twist error
+        if (sum % 3 != 0) return -5;
 
-        // Check parity (corner and edge parity must match)
-        if (edgeParity() != cornerParity()) return -6; // Parity error
+        // Corner and edge parity must match (physical constraint)
+        if (edgeParity() != cornerParity()) return -6;
 
         return 0;
     }
 
+    /**
+     * Compute binomial coefficient C(n,k) = n! / (k! * (n-k)!).
+     * Used for combinatorial coordinate encoding.
+     */
     public static int nCk(int n, int k) {
         if (n < k || k < 0) return 0;
-        if (k > n / 2) k = n - k;
+        if (k > n / 2) k = n - k;  // Optimization: C(n,k) = C(n,n-k)
         int result = 1;
         for (int i = 0; i < k; i++) {
             result = result * (n - i) / (i + 1);
@@ -532,12 +614,14 @@ public class PieceCube {
         return result;
     }
 
+    /** Rotate array elements left within range [l,r]: arr[l] moves to arr[r] */
     private static void rotateLeft(int[] arr, int l, int r) {
         int temp = arr[l];
         for (int i = l; i < r; i++) arr[i] = arr[i + 1];
         arr[r] = temp;
     }
 
+    /** Rotate array elements right within range [l,r]: arr[r] moves to arr[l] */
     private static void rotateRight(int[] arr, int l, int r) {
         int temp = arr[r];
         for (int i = r; i > l; i--) arr[i] = arr[i - 1];
