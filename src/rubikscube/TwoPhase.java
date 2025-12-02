@@ -2,253 +2,254 @@ package rubikscube;
 
 /**
  * Two-phase algorithm implementation for solving Rubik's Cube.
- * 
- * Phase 1: Reduce cube to <U,D,R2,F2,L2,B2> subgroup
- *          (orient all pieces, position E-slice edges)
- * 
- * Phase 2: Solve within the subgroup using only allowed moves
+ * Direct port of the working Search.java algorithm structure.
  */
 public class TwoPhase {
 
-    // Move names for solution output
-    private static final String[] MOVE_NAMES = {
-        "U", "U2", "U'", "R", "R2", "R'", "F", "F2", "F'",
-        "D", "D2", "D'", "L", "L2", "L'", "B", "B2", "B'"
-    };
+    // Search trace storage - axis (0-5) and power (1-3)
+    static int[] axis = new int[31];
+    static int[] power = new int[31];
 
-    // Phase 2 allowed moves (indices into the 18-move array)
-    private static final int[] PHASE2_MOVES = {0, 1, 2, 4, 7, 9, 10, 11, 13, 16};
+    // Phase-1 coordinates along search path
+    static int[] flip = new int[31];
+    static int[] twist = new int[31];
+    static int[] slice = new int[31];
 
-    // Search state
-    private int[] phase1Moves = new int[31];
-    private int[] phase2Moves = new int[31];
-    private int[] phase1Axis = new int[31];
-    private int[] phase2Axis = new int[31];
+    // Phase-2 coordinates
+    static int[] parity = new int[31];
+    static int[] cornerPerm = new int[31];
+    static int[] slicePerm = new int[31];
+    static int[] urToUl = new int[31];
+    static int[] ubToDf = new int[31];
+    static int[] udEdgePerm = new int[31];
 
-    // Coordinate stacks for phase 1
-    private int[] twistStack = new int[31];
-    private int[] flipStack = new int[31];
-    private int[] sliceStack = new int[31];
-
-    // Coordinate stacks for phase 2
-    private int[] cornerStack = new int[31];
-    private int[] edgeStack = new int[31];
-    private int[] slice2Stack = new int[31];
-    private int[] parityStack = new int[31];
-
-    // Helper coordinates for merging
-    private int[] urToUlStack = new int[31];
-    private int[] ubToDfStack = new int[31];
-
-    // Original cube for phase 2 coordinate computation
-    private PieceCube originalCube;
-
-    // Best solution found
-    private String solution = "";
-    private int solutionLength = Integer.MAX_VALUE;
+    // IDA* heuristic estimates
+    static int[] minDistPhase1 = new int[31];
+    static int[] minDistPhase2 = new int[31];
 
     /**
-     * Solve the cube, returning solution as move string.
-     * @param cube The scrambled cube
-     * @param maxDepth Maximum total solution length
-     * @param timeout Maximum seconds to search
-     * @return Solution string or error message
+     * Generate solution string from axis/power arrays.
+     * Outputs repeated letters: U'=UUU, U2=UU
      */
-    public static String solve(PieceCube cube, int maxDepth, long timeout) {
-        TwoPhase search = new TwoPhase();
-        return search.doSolve(cube, maxDepth, timeout);
-    }
-
-    private String doSolve(PieceCube cube, int maxDepth, long timeout) {
-        long startTime = System.currentTimeMillis();
-        long endTime = startTime + timeout * 1000;
-
-        // Store original cube for phase 2 coordinate computation
-        originalCube = cube;
-
-        // Initial coordinates
-        twistStack[0] = cube.getTwist();
-        flipStack[0] = cube.getFlip();
-        sliceStack[0] = cube.getSlice();
-        parityStack[0] = cube.cornerParity();
-        urToUlStack[0] = cube.getURtoUL();
-        ubToDfStack[0] = cube.getUBtoDF();
-
-        // Try increasing phase 1 depths
-        for (int phase1Depth = 0; phase1Depth <= maxDepth; phase1Depth++) {
-            if (System.currentTimeMillis() > endTime) {
-                break;
-            }
-
-            int result = phase1Search(0, phase1Depth, -1, maxDepth, endTime);
-            if (result >= 0) {
-                // Found a solution
-                break;
+    static String solutionToString(int length) {
+        StringBuilder s = new StringBuilder();
+        for (int i = 0; i < length; i++) {
+            String face = switch (axis[i]) {
+                case 0 -> "U";
+                case 1 -> "R";
+                case 2 -> "F";
+                case 3 -> "D";
+                case 4 -> "L";
+                case 5 -> "B";
+                default -> "";
+            };
+            for (int j = 0; j < power[i]; j++) {
+                s.append(face);
             }
         }
-
-        if (solution.isEmpty()) {
-            return "Error: No solution found";
-        }
-        return solution;
+        return s.toString();
     }
 
     /**
-     * Phase 1 IDA* search.
-     * @return -1 if no solution at this depth, >= 0 if found
+     * Solve the cube using two-phase algorithm.
      */
-    private int phase1Search(int depth, int maxPhase1, int lastAxis, int maxTotal, long endTime) {
-        if (System.currentTimeMillis() > endTime) return -1;
+    public static String solve(PieceCube pc, int maxDepth, long timeOut) {
+        int s;
 
-        int twist = twistStack[depth];
-        int flip = flipStack[depth];
-        int slice = sliceStack[depth] / 24; // Only need position, not permutation
+        // Verify cube validity
+        if ((s = pc.verify()) != 0)
+            return "Error " + Math.abs(s);
 
-        // Check pruning
-        int prune1 = Tables.getPruning(Tables.sliceTwistPrune, Tables.N_SLICE1 * twist + slice);
-        int prune2 = Tables.getPruning(Tables.sliceFlipPrune, Tables.N_SLICE1 * flip + slice);
-        int estimate = Math.max(prune1, prune2);
+        // Initialize coordinates from piece cube
+        flip[0] = pc.getFlip();
+        twist[0] = pc.getTwist();
+        parity[0] = pc.cornerParity();
+        int fullSlice = pc.getSlice();
+        slice[0] = fullSlice / 24;
+        slicePerm[0] = fullSlice;
+        cornerPerm[0] = pc.getCornerPerm();
+        urToUl[0] = pc.getURtoUL();
+        ubToDf[0] = pc.getUBtoDF();
 
-        if (estimate > maxPhase1 - depth) {
-            return -1; // Can't reach goal
-        }
+        // Initialize search
+        power[0] = 0;
+        axis[0] = 0;
+        minDistPhase1[1] = 1;
+        int mv, n = 0;
+        boolean busy = false;
+        int depthPhase1 = 1;
 
-        // Phase 1 goal reached?
-        if (twist == 0 && flip == 0 && sliceStack[depth] < 24) {
-            // Initialize phase 2 coordinates
-            cornerStack[depth] = cubeCornerPerm(depth);
-            slice2Stack[depth] = sliceStack[depth];
-            parityStack[depth] = parityStack[0]; // Recompute from moves
-            
-            // Compute parity after phase 1 moves
-            int parity = parityStack[0];
-            for (int i = 0; i < depth; i++) {
-                parity = Tables.parityMove[parity][phase1Moves[i]];
-            }
-            parityStack[depth] = parity;
+        long tStart = System.currentTimeMillis();
 
-            // Compute edge coordinate
-            int urUl = urToUlStack[0];
-            int ubDf = ubToDfStack[0];
-            for (int i = 0; i < depth; i++) {
-                urUl = Tables.urToUlMove[urUl][phase1Moves[i]];
-                ubDf = Tables.ubToDfMove[ubDf][phase1Moves[i]];
-            }
-            edgeStack[depth] = Tables.mergeURtoULandUBtoDF[urUl][ubDf];
+        // Main IDA* loop for phase-1
+        do {
+            do {
+                if ((depthPhase1 - n > minDistPhase1[n + 1]) && !busy) {
+                    // Initialize next move
+                    if (axis[n] == 0 || axis[n] == 3) {
+                        axis[++n] = 1;
+                    } else {
+                        axis[++n] = 0;
+                    }
+                    power[n] = 1;
+                } else if (++power[n] > 3) {
+                    // Power overflow, increment axis
+                    do {
+                        if (++axis[n] > 5) {
+                            // Timeout check
+                            if (System.currentTimeMillis() - tStart > timeOut << 10)
+                                return "Error 8";
 
-            // Search phase 2
-            int maxPhase2 = Math.min(maxTotal - depth, solutionLength - depth - 1);
-            for (int phase2Depth = 0; phase2Depth <= maxPhase2; phase2Depth++) {
-                int result = phase2Search(depth, phase2Depth, lastAxis, endTime);
-                if (result >= 0) {
-                    return result;
+                            if (n == 0) {
+                                if (depthPhase1 >= maxDepth)
+                                    return "Error 7";
+                                else {
+                                    depthPhase1++;
+                                    axis[n] = 0;
+                                    power[n] = 1;
+                                    busy = false;
+                                    break;
+                                }
+                            } else {
+                                n--;
+                                busy = true;
+                                break;
+                            }
+                        } else {
+                            power[n] = 1;
+                            busy = false;
+                        }
+                    } while (n != 0 && (axis[n - 1] == axis[n] || axis[n - 1] - 3 == axis[n]));
+                } else {
+                    busy = false;
+                }
+            } while (busy);
+
+            // Compute new coordinates after move
+            mv = 3 * axis[n] + power[n] - 1;
+            flip[n + 1] = Tables.flipMove[flip[n]][mv];
+            twist[n + 1] = Tables.twistMove[twist[n]][mv];
+            slice[n + 1] = Tables.sliceMove[slice[n] * 24][mv] / 24;
+
+            // Compute heuristic
+            minDistPhase1[n + 1] = Math.max(
+                Tables.getPruning(Tables.sliceFlipPrune, Tables.N_SLICE1 * flip[n + 1] + slice[n + 1]),
+                Tables.getPruning(Tables.sliceTwistPrune, Tables.N_SLICE1 * twist[n + 1] + slice[n + 1]));
+
+            // If reached H subgroup, try phase-2
+            if (minDistPhase1[n + 1] == 0 && n >= depthPhase1 - 5) {
+                minDistPhase1[n + 1] = 10;
+                if (n == depthPhase1 - 1 && (s = totalDepth(depthPhase1, maxDepth)) >= 0) {
+                    if (s == depthPhase1 || (axis[depthPhase1 - 1] != axis[depthPhase1] && axis[depthPhase1 - 1] != axis[depthPhase1] + 3))
+                        return solutionToString(s);
                 }
             }
-            return -1;
-        }
-
-        // Try all moves
-        for (int move = 0; move < 18; move++) {
-            int axis = move / 3;
-            
-            // Skip same axis or opposite axis after same axis
-            if (axis == lastAxis) continue;
-            if (axis == lastAxis - 3 || axis == lastAxis + 3) continue;
-
-            twistStack[depth + 1] = Tables.twistMove[twist][move];
-            flipStack[depth + 1] = Tables.flipMove[flip][move];
-            sliceStack[depth + 1] = Tables.sliceMove[sliceStack[depth]][move];
-            phase1Moves[depth] = move;
-            phase1Axis[depth] = axis;
-
-            int result = phase1Search(depth + 1, maxPhase1, axis, maxTotal, endTime);
-            if (result >= 0) return result;
-        }
-
-        return -1;
+        } while (true);
     }
 
     /**
-     * Phase 2 IDA* search.
+     * Phase-2 search. Returns total depth or -1 if no solution found.
      */
-    private int phase2Search(int phase1Len, int maxPhase2, int lastAxis, long endTime) {
-        return phase2SearchInner(phase1Len, 0, maxPhase2, lastAxis, endTime);
-    }
+    static int totalDepth(int depthPhase1, int maxDepth) {
+        int mv, d1, d2;
+        int maxDepthPhase2 = Math.min(10, maxDepth - depthPhase1);
 
-    private int phase2SearchInner(int phase1Len, int depth, int maxPhase2, int lastAxis, long endTime) {
-        if (System.currentTimeMillis() > endTime) return -1;
+        // Apply phase-1 moves to get phase-2 starting coordinates
+        for (int i = 0; i < depthPhase1; i++) {
+            mv = 3 * axis[i] + power[i] - 1;
+            cornerPerm[i + 1] = Tables.cornerPermMove[cornerPerm[i]][mv];
+            slicePerm[i + 1] = Tables.sliceMove[slicePerm[i]][mv];
+            parity[i + 1] = Tables.parityMove[parity[i]][mv];
+        }
 
-        int corner = cornerStack[phase1Len + depth];
-        int edge = edgeStack[phase1Len + depth];
-        int slice = slice2Stack[phase1Len + depth];
-        int parity = parityStack[phase1Len + depth];
-
-        // Check pruning
-        int prune1 = Tables.getPruning(Tables.sliceCornerPrune, 
-                     (Tables.N_SLICE2 * corner + slice) * 2 + parity);
-        int prune2 = Tables.getPruning(Tables.sliceEdgePrune,
-                     (Tables.N_SLICE2 * edge + slice) * 2 + parity);
-        int estimate = Math.max(prune1, prune2);
-
-        if (estimate > maxPhase2 - depth) {
+        // Check corner pruning
+        d1 = Tables.getPruning(Tables.sliceCornerPrune,
+            (Tables.N_SLICE2 * cornerPerm[depthPhase1] + slicePerm[depthPhase1]) * 2 + parity[depthPhase1]);
+        if (d1 > maxDepthPhase2)
             return -1;
+
+        // Compute edge coordinate
+        for (int i = 0; i < depthPhase1; i++) {
+            mv = 3 * axis[i] + power[i] - 1;
+            urToUl[i + 1] = Tables.urToUlMove[urToUl[i]][mv];
+            ubToDf[i + 1] = Tables.ubToDfMove[ubToDf[i]][mv];
         }
+        udEdgePerm[depthPhase1] = Tables.mergeURtoULandUBtoDF[urToUl[depthPhase1]][ubToDf[depthPhase1]];
 
-        // Goal reached?
-        if (corner == 0 && edge == 0 && slice == 0) {
-            // Build solution string
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < phase1Len; i++) {
-                sb.append(MOVE_NAMES[phase1Moves[i]]);
-            }
-            for (int i = 0; i < depth; i++) {
-                sb.append(MOVE_NAMES[phase2Moves[i]]);
-            }
-            
-            int totalLen = phase1Len + depth;
-            if (totalLen < solutionLength) {
-                solutionLength = totalLen;
-                solution = sb.toString();
-            }
-            return totalLen;
-        }
+        // Check edge pruning
+        d2 = Tables.getPruning(Tables.sliceEdgePrune,
+            (Tables.N_SLICE2 * udEdgePerm[depthPhase1] + slicePerm[depthPhase1]) * 2 + parity[depthPhase1]);
+        if (d2 > maxDepthPhase2)
+            return -1;
 
-        // Try phase 2 moves
-        for (int m : PHASE2_MOVES) {
-            int axis = m / 3;
-            
-            if (axis == lastAxis) continue;
-            if (axis == lastAxis - 3 || axis == lastAxis + 3) continue;
+        // Already solved?
+        if ((minDistPhase2[depthPhase1] = Math.max(d1, d2)) == 0)
+            return depthPhase1;
 
-            cornerStack[phase1Len + depth + 1] = Tables.cornerPermMove[corner][m];
-            edgeStack[phase1Len + depth + 1] = Tables.udEdgePermMove[edge][m];
-            slice2Stack[phase1Len + depth + 1] = Tables.sliceMove[slice][m];
-            parityStack[phase1Len + depth + 1] = Tables.parityMove[parity][m];
-            phase2Moves[depth] = m;
-            phase2Axis[depth] = axis;
+        // Phase-2 IDA* search
+        int depthPhase2 = 1;
+        int n = depthPhase1;
+        boolean busy = false;
+        power[depthPhase1] = 0;
+        axis[depthPhase1] = 0;
+        minDistPhase2[n + 1] = 1;
 
-            int result = phase2SearchInner(phase1Len, depth + 1, maxPhase2, axis, endTime);
-            if (result >= 0) return result;
-        }
+        do {
+            do {
+                if ((depthPhase1 + depthPhase2 - n > minDistPhase2[n + 1]) && !busy) {
+                    if (axis[n] == 0 || axis[n] == 3) {
+                        axis[++n] = 1;
+                        power[n] = 2;
+                    } else {
+                        axis[++n] = 0;
+                        power[n] = 1;
+                    }
+                } else if ((axis[n] == 0 || axis[n] == 3) ? (++power[n] > 3) : ((power[n] = power[n] + 2) > 3)) {
+                    do {
+                        if (++axis[n] > 5) {
+                            if (n == depthPhase1) {
+                                if (depthPhase2 >= maxDepthPhase2)
+                                    return -1;
+                                else {
+                                    depthPhase2++;
+                                    axis[n] = 0;
+                                    power[n] = 1;
+                                    busy = false;
+                                    break;
+                                }
+                            } else {
+                                n--;
+                                busy = true;
+                                break;
+                            }
+                        } else {
+                            if (axis[n] == 0 || axis[n] == 3)
+                                power[n] = 1;
+                            else
+                                power[n] = 2;
+                            busy = false;
+                        }
+                    } while (n != depthPhase1 && (axis[n - 1] == axis[n] || axis[n - 1] - 3 == axis[n]));
+                } else {
+                    busy = false;
+                }
+            } while (busy);
 
-        return -1;
-    }
+            // Compute new coordinates
+            mv = 3 * axis[n] + power[n] - 1;
+            cornerPerm[n + 1] = Tables.cornerPermMove[cornerPerm[n]][mv];
+            slicePerm[n + 1] = Tables.sliceMove[slicePerm[n]][mv];
+            parity[n + 1] = Tables.parityMove[parity[n]][mv];
+            udEdgePerm[n + 1] = Tables.udEdgePermMove[udEdgePerm[n]][mv];
 
-    /**
-     * Compute corner permutation after applying phase 1 moves to original cube.
-     */
-    private int cubeCornerPerm(int phase1Len) {
-        // Create copy of original cube
-        PieceCube cube = new PieceCube();
-        cube.cornerPerm = originalCube.cornerPerm.clone();
-        cube.cornerOrient = originalCube.cornerOrient.clone();
-        cube.edgePerm = originalCube.edgePerm.clone();
-        cube.edgeOrient = originalCube.edgeOrient.clone();
-        
-        // Apply phase 1 moves
-        for (int i = 0; i < phase1Len; i++) {
-            cube.applyMove(phase1Moves[i]);
-        }
-        return cube.getCornerPerm();
+            minDistPhase2[n + 1] = Math.max(
+                Tables.getPruning(Tables.sliceEdgePrune,
+                    (Tables.N_SLICE2 * udEdgePerm[n + 1] + slicePerm[n + 1]) * 2 + parity[n + 1]),
+                Tables.getPruning(Tables.sliceCornerPrune,
+                    (Tables.N_SLICE2 * cornerPerm[n + 1] + slicePerm[n + 1]) * 2 + parity[n + 1]));
+
+        } while (minDistPhase2[n + 1] != 0);
+
+        return depthPhase1 + depthPhase2;
     }
 }

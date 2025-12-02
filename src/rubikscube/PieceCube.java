@@ -522,8 +522,6 @@ public class PieceCube {
         return 0;
     }
 
-    // ==================== Utility Functions ====================
-
     public static int nCk(int n, int k) {
         if (n < k || k < 0) return 0;
         if (k > n / 2) k = n - k;

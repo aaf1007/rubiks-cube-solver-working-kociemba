@@ -1,6 +1,8 @@
 package rubikscube;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 
 /**
@@ -42,12 +44,21 @@ public class Solver {
 
         System.out.println("Solution: " + solution);
 
-        // Verify solution works
-        if (verifySolution(Input_Filename, solution)) {
-            System.out.println("Solution verified!");
-        } else {
-            System.out.println("Solution verification failed!");
+        for (int i = 0; i < solution.length(); i++) {
+            int move = charToMove(solution.charAt(i));  // char → int
+            if (move >= 0) {
+                CC.applyMove(move);  // now it's an int
+            }
         }
+
+        System.out.println("Solved: " + CC.isSolved());
+
+        // Verify solution works
+        // if (verifySolution(Input_Filename, solution)) {
+        //     System.out.println("Solution verified!");
+        // } else {
+        //     System.out.println("Solution verification failed!");
+        // }
 
         // Write solution to output file
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(args[1]))) {
@@ -57,47 +68,29 @@ public class Solver {
 
     /**
      * Verify solution by applying moves to original cube and checking if solved.
+     * Solution format: repeated letters (e.g., UUU = U', UU = U2)
      */
     private static boolean verifySolution(String filename, String solution) throws IOException {
         StickerCube cube = new StickerCube(filename);
         PieceCube pc = cube.toPieceCube();
 
-        // Parse and apply each move in solution
-        int i = 0;
-        while (i < solution.length()) {
-            char face = solution.charAt(i);
-            int baseMove = faceToBase(face);
-            if (baseMove < 0) {
-                i++;
-                continue;
+        // Each character is a single quarter turn
+        for (int i = 0; i < solution.length(); i++) {
+            int move = charToMove(solution.charAt(i));
+            if (move >= 0) {
+                pc.applyMove(move);
             }
-
-            // Check for modifier (2 or ')
-            int move = baseMove; // Default: quarter turn clockwise
-            if (i + 1 < solution.length()) {
-                char next = solution.charAt(i + 1);
-                if (next == '2') {
-                    move = baseMove + 1; // Half turn
-                    i++;
-                } else if (next == '\'') {
-                    move = baseMove + 2; // Counter-clockwise
-                    i++;
-                }
-            }
-
-            pc.applyMove(move);
-            i++;
         }
 
         return pc.isSolved();
     }
 
     /**
-     * Convert face character to base move index.
+     * Convert face character to quarter-turn move index.
      */
-    private static int faceToBase(char c) {
+    private static int charToMove(char c) {
         switch (c) {
-            case 'U': return 0;
+            case 'U': return 0;  // U (quarter turn)
             case 'R': return 3;
             case 'F': return 6;
             case 'D': return 9;
