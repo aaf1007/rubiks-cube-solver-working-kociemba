@@ -1,13 +1,15 @@
 package rubikscube;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 
 /**
- * Sticker-level representation of a Rubik's Cube.
+ * Facelet representation of a Rubik's Cube.
  *
  * This class handles the input format: a text file with 54 colored stickers.
  * It parses the file and converts the sticker colors into a piece-level
- * representation (Cubie) that the solver can use.
+ * representation (Cubie) that solver can use.
  *
  * The cube is unfolded in the file as:
  *       OOO          (Up face)
@@ -109,18 +111,17 @@ public class RubiksCube {
      * @throws IOException if file can't be read or has wrong format
      */
     public RubiksCube(String filename) throws IOException {
-        BufferedReader reader = new BufferedReader(new FileReader(filename));
-        String[] lines = new String[9];
-
-        // Read all 9 lines
-        for (int i = 0; i < 9; i++) {
-            lines[i] = reader.readLine();
-            if (lines[i] == null) {
-                reader.close();
-                throw new IOException("File has fewer than 9 lines");
+        String[] lines;
+        try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {
+            lines = new String[9];
+            // Read all 9 lines
+            for (int i = 0; i < 9; i++) {
+                lines[i] = reader.readLine();
+                if (lines[i] == null) {
+                    throw new IOException("File has fewer than 9 lines");
+                }
             }
         }
-        reader.close();
 
         // Parse each face from its position in the unfolded layout
         parseFace(lines, 0, 3, U);  // Up face: lines 0-2, columns 3-5

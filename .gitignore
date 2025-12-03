@@ -2,3 +2,4 @@
 *.md
 *.class
 *.pdf
+!README.md

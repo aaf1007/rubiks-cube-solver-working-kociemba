@@ -3,8 +3,6 @@ package rubikscube;
 /**
  * Precomputed lookup tables for the two-phase Rubik's Cube solving algorithm.
  *
- * This class contains two types of tables:
- *
  * 1. Move Tables: Given a coordinate and a move, look up the resulting coordinate.
  *    This allows O(1) move application instead of actually manipulating the cube.
  *    Format: moveTable[currentCoord][move] = newCoord
@@ -53,7 +51,7 @@ public class Tables {
     public static short[][] mergeURtoULandUBtoDF = new short[336][336];
 
     // Pruning Tables: store minimum moves to solve each coordinate
-    // Packed as nibbles (4 bits each) to save memory - 2 values per byte
+    // Packed as Half-bytes (4 bits each) to save memory - 2 values per byte
 
     // Phase 1 pruning: heuristic = max(sliceTwistPrune, sliceFlipPrune)
     public static byte[] sliceTwistPrune = new byte[N_SLICE1 * N_TWIST / 2 + 1];
@@ -320,30 +318,30 @@ public class Tables {
     }
 
     /**
-     * Store a pruning value (0-15) at the given index using nibble packing.
+     * Store a pruning value (0-15) at the given index using Half-byte packing.
      * Two values are stored per byte to save memory:
      * - Even indices use the lower 4 bits
      * - Odd indices use the upper 4 bits
      */
     public static void setPruning(byte[] table, int index, byte value) {
         if ((index & 1) == 0) {
-            // Even index: store in lower nibble, preserve upper nibble
+            // Even index: store in lower, preserve upper
             table[index / 2] = (byte) ((table[index / 2] & 0xF0) | (value & 0x0F));
         } else {
-            // Odd index: store in upper nibble, preserve lower nibble
+            // Odd index: store in upper, preserve lower
             table[index / 2] = (byte) ((table[index / 2] & 0x0F) | ((value & 0x0F) << 4));
         }
     }
 
     /**
      * Retrieve a pruning value (0-15) from the given index.
-     * Extracts the appropriate nibble based on whether index is even or odd.
+     * Extracts the appropriate Half-byte based on whether index is even or odd.
      */
     public static byte getPruning(byte[] table, int index) {
         if ((index & 1) == 0) {
-            return (byte) (table[index / 2] & 0x0F);  // Lower nibble
+            return (byte) (table[index / 2] & 0x0F);
         } else {
-            return (byte) ((table[index / 2] >>> 4) & 0x0F);  // Upper nibble
+            return (byte) ((table[index / 2] >>> 4) & 0x0F);  
         }
     }
 }

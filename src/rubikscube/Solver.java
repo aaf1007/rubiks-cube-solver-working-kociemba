@@ -22,7 +22,7 @@ public class Solver {
         // Solve using two-phase algorithm
         String solution = TwoPhase.solve(cubie, 25, 10);
 
-        System.out.println("\u001B[32mSolution: " + solution + "\u001B[0m");
+        //System.out.println("\u001B[32mSolution: " + solution + "\u001B[0m");
 
         for (int i = 0; i < solution.length(); i++) {
             int move = charToMove(solution.charAt(i));
@@ -31,7 +31,7 @@ public class Solver {
             }
         }
         // Verify Solution
-        System.out.println("Solved: " + cubie.isSolved());
+        //System.out.println("Solved: " + cubie.isSolved());
 
         // Write solution to output file
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(args[1]))) {

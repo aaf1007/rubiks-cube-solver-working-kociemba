@@ -1,7 +1,7 @@
 package rubikscube;
 
 /**
- * Piece-level representation of a Rubik's Cube.
+ * Cubie-level representation of a Rubik's Cube.
  *
  * The cube is represented by 4 arrays:
  * - cornerPerm[8]: which corner piece is at each position (0-7)
