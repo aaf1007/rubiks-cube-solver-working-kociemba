@@ -3,3 +3,5 @@
 *.class
 *.pdf
 !README.md
+src/"CMPT 225 Final Project Documentation".pdf
+!rubiks-cube-solver-working-kociemba/"CMPT 225 Final Project Documentation".pdf
